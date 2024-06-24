@@ -1,5 +1,8 @@
 // require("dotenv").config();
 import dotenv from "dotenv";
+import { app } from "./app.js";
+// import express from "express";
+// const express = require("express");
 
 import connectDB from "./db/index.js";
 
@@ -9,12 +12,12 @@ dotenv.config({
 const PORT = process.env.PORT || 8000;
 connectDB()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    app.listen(process.env.PORT || 8000, () => {
+      console.log(`Server is running on port ${process.env.PORT}`);
     });
   })
   .catch((err) => {
-    console.log("mongo connection fail", err);
+    console.log("Mongo connection fail", err);
   });
 
 // const app = express()(async () => {
