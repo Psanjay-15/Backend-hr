@@ -241,8 +241,8 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
   const user = await User.findById(req.user?._id);
 
-  const isPasswordCorrect = await isPasswordCorrect(oldPassword);
-  if (!isPasswordCorrect) {
+  const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordValid) {
     throw new ApiError(400, "Invalid Old Password");
   }
 
@@ -255,7 +255,9 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  return res.status(200, req.user, "Current Uset Fetched Successfully");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "Current User Fetched Successfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -265,7 +267,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Please enter fullName or email");
   }
 
-  const user = User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
@@ -278,9 +280,9 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     }
   ).select("-password");
 
-  return res.status(
-    new ApiResponse(200, user, "User Details Updated successfully")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "User Details Updated successfully"));
 });
 
 const upadateAvatar = asyncHandler(async (req, res) => {
@@ -305,7 +307,9 @@ const upadateAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
-  return res.status(new ApiResponse(200, user, "Avatar Updated successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar Updated successfully"));
 });
 
 const updateCoverImage = asyncHandler(async (req, res) => {
@@ -330,9 +334,79 @@ const updateCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
-  return res.status(
-    new ApiResponse(200, user, "Cover Image Updated successfully")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover Image Updated successfully"));
+});
+
+const getUserChannelProflie = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "Please enter valid username");
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscriberCount: {
+          $size: "$subscribers",
+        },
+        channelSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        subscriberCount: 1,
+        channelSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel doesnot exist ");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User Channel fetched Successfully")
+    );
 });
 
 export {
@@ -345,4 +419,5 @@ export {
   updateAccountDetails,
   upadateAvatar,
   updateCoverImage,
+  getUserChannelProflie,
 };
